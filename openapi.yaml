@@ -1,0 +1,1480 @@
+openapi: 3.0.3
+info:
+  title: Real Estate Fractional Investment Platform API
+  version: 1.0.0
+  description: >
+    HTTP API for a fractional real estate investment marketplace.
+    The client never connects to the database directly; all access
+    is mediated through this API. This spec exposes CRUD operations
+    for profiles, properties, listings, holdings, transactions,
+    notifications, and admin actions.
+
+servers:
+  - url: https://api.example.com
+    description: Production server
+  - url: https://api.sandbox.example.com
+    description: Sandbox server
+
+tags:
+  - name: Profiles
+  - name: Properties
+  - name: Listings
+  - name: Holdings
+  - name: Transactions
+  - name: Notifications
+  - name: AdminActions
+
+paths:
+  /profiles:
+    get:
+      tags: [Profiles]
+      summary: List profiles
+      description: List user profiles. May be restricted to admins in implementation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [user, admin]
+        - in: query
+          name: kyc_status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of profiles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Profile'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      tags: [Profiles]
+      summary: Create a profile
+      description: >
+        Create a new profile for an existing auth user.
+        In production, auth_id is typically derived from the authenticated user token.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileCreate'
+      responses:
+        '201':
+          description: Profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /profiles/{id}:
+    get:
+      tags: [Profiles]
+      summary: Get a profile
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        '200':
+          description: Profile found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Profiles]
+      summary: Update a profile
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdate'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Profiles]
+      summary: Delete a profile
+      description: >
+        Delete a profile. Related holdings and notifications will be
+        cascaded according to database rules.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        '204':
+          description: Profile deleted
+        '404':
+          description: Profile not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /properties:
+    get:
+      tags: [Properties]
+      summary: List properties
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: search
+          description: Search by property name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of properties
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Property'
+                  total:
+                    type: integer
+    post:
+      tags: [Properties]
+      summary: Create a property
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropertyCreate'
+      responses:
+        '201':
+          description: Property created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /properties/{propertyId}:
+    get:
+      tags: [Properties]
+      summary: Get a property
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: propertyId
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        '200':
+          description: Property found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '404':
+          description: Property not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Properties]
+      summary: Update a property
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: propertyId
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropertyUpdate'
+      responses:
+        '200':
+          description: Property updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        '404':
+          description: Property not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Properties]
+      summary: Delete a property
+      description: >
+        Deletes a property. Related listings will be deleted via cascade.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: propertyId
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        '204':
+          description: Property deleted
+        '404':
+          description: Property not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /listings:
+    get:
+      tags: [Listings]
+      summary: List listings
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            description: Filter by listing status (e.g. draft, active, closed)
+        - in: query
+          name: property_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of listings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Listing'
+                  total:
+                    type: integer
+    post:
+      tags: [Listings]
+      summary: Create a listing
+      description: >
+        Create a new listing for a property. created_by_user_id is typically
+        the authenticated profile performing the action.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListingCreate'
+      responses:
+        '201':
+          description: Listing created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /listings/{listingId}:
+    get:
+      tags: [Listings]
+      summary: Get a listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: listingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Listing found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        '404':
+          description: Listing not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Listings]
+      summary: Update a listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: listingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListingUpdate'
+      responses:
+        '200':
+          description: Listing updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        '404':
+          description: Listing not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Listings]
+      summary: Delete a listing
+      description: >
+        Deletes a listing. Related holdings and transactions will be
+        handled according to database foreign key rules.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: listingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Listing deleted
+        '404':
+          description: Listing not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /holdings:
+    get:
+      tags: [Holdings]
+      summary: List holdings
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: listing_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of holdings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Holding'
+                  total:
+                    type: integer
+    post:
+      tags: [Holdings]
+      summary: Create a holding
+      description: >
+        Creates a holding record for a user/listing pair.
+        In practice, this might be derived from completed transactions.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoldingCreate'
+      responses:
+        '201':
+          description: Holding created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Holding'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /holdings/{holdingId}:
+    get:
+      tags: [Holdings]
+      summary: Get a holding
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: holdingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Holding found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Holding'
+        '404':
+          description: Holding not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Holdings]
+      summary: Update a holding
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: holdingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoldingUpdate'
+      responses:
+        '200':
+          description: Holding updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Holding'
+        '404':
+          description: Holding not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Holdings]
+      summary: Delete a holding
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: holdingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Holding deleted
+        '404':
+          description: Holding not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /transactions:
+    get:
+      tags: [Transactions]
+      summary: List transactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: listing_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+    post:
+      tags: [Transactions]
+      summary: Create a transaction
+      description: >
+        Creates a buy or sell transaction. Implementation should
+        validate business rules and may update holdings accordingly.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreate'
+      responses:
+        '201':
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /transactions/{transactionId}:
+    get:
+      tags: [Transactions]
+      summary: Get a transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: transactionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Transactions]
+      summary: Update a transaction
+      description: >
+        Typically used to update status (e.g. from pending to completed)
+        or to attach a blockchain hash.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: transactionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionUpdate'
+      responses:
+        '200':
+          description: Transaction updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Transactions]
+      summary: Delete a transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: transactionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Transaction deleted
+        '404':
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: is_read
+          schema:
+            type: boolean
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+                  total:
+                    type: integer
+    post:
+      tags: [Notifications]
+      summary: Create a notification
+      description: >
+        Creates a notification for a user. In many cases, notifications will be
+        generated by server-side logic reacting to transactions or KYC changes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationCreate'
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /notifications/{notificationId}:
+    get:
+      tags: [Notifications]
+      summary: Get a notification
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: notificationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '404':
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags: [Notifications]
+      summary: Update a notification
+      description: >
+        Commonly used to mark as read/unread.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: notificationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUpdate'
+      responses:
+        '200':
+          description: Notification updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '404':
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Notifications]
+      summary: Delete a notification
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: notificationId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Notification deleted
+        '404':
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-actions:
+    get:
+      tags: [AdminActions]
+      summary: List admin actions
+      description: Admin-only endpoint listing logged admin actions.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: admin_user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: action_type
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of admin actions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminAction'
+                  total:
+                    type: integer
+    post:
+      tags: [AdminActions]
+      summary: Create an admin action
+      description: >
+        Records an admin action. admin_user_id must reference a profile with role=admin.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminActionCreate'
+      responses:
+        '201':
+          description: Admin action created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAction'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /admin-actions/{adminActionId}:
+    get:
+      tags: [AdminActions]
+      summary: Get an admin action
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: adminActionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Admin action found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAction'
+        '404':
+          description: Admin action not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [AdminActions]
+      summary: Delete an admin action
+      description: >
+        Deletes an admin action log entry. Business policy may restrict this in production.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: adminActionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Admin action deleted
+        '404':
+          description: Admin action not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized – missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequestError:
+      description: Bad request – validation or input error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    UUID:
+      type: string
+      format: uuid
+      example: "11111111-1111-1111-1111-111111111111"
+
+    Timestamp:
+      type: string
+      format: date-time
+      example: "2025-01-01T12:00:00Z"
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+      required: [message]
+
+    Profile:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        auth_id:
+          $ref: '#/components/schemas/UUID'
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+          nullable: true
+        role:
+          type: string
+          description: User role
+          enum: [user, admin]
+        kyc_status:
+          type: string
+          description: KYC status (e.g. pending, approved, rejected)
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - id
+        - auth_id
+        - email
+        - role
+        - kyc_status
+
+    ProfileCreate:
+      type: object
+      properties:
+        auth_id:
+          $ref: '#/components/schemas/UUID'
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+          default: user
+        kyc_status:
+          type: string
+          default: pending
+      required:
+        - auth_id
+        - email
+
+    ProfileUpdate:
+      type: object
+      properties:
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        kyc_status:
+          type: string
+
+    Property:
+      type: object
+      properties:
+        property_id:
+          $ref: '#/components/schemas/UUID'
+        name:
+          type: string
+        location:
+          type: string
+          nullable: true
+        property_type:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - property_id
+        - name
+
+    PropertyCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        property_type:
+          type: string
+        description:
+          type: string
+      required:
+        - name
+
+    PropertyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        property_type:
+          type: string
+        description:
+          type: string
+
+    Listing:
+      type: object
+      properties:
+        listing_id:
+          $ref: '#/components/schemas/UUID'
+        property_id:
+          $ref: '#/components/schemas/UUID'
+        created_by_user_id:
+          $ref: '#/components/schemas/UUID'
+        status:
+          type: string
+          description: Listing status (draft, active, closed, etc.)
+        price_per_share_usd:
+          type: string
+          format: decimal
+        min_investment_usd:
+          type: string
+          format: decimal
+        max_investment_usd:
+          type: string
+          format: decimal
+          nullable: true
+        total_shares_available:
+          type: integer
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - listing_id
+        - property_id
+        - status
+        - price_per_share_usd
+        - min_investment_usd
+        - total_shares_available
+
+    ListingCreate:
+      type: object
+      properties:
+        property_id:
+          $ref: '#/components/schemas/UUID'
+        created_by_user_id:
+          $ref: '#/components/schemas/UUID'
+        status:
+          type: string
+          default: draft
+        price_per_share_usd:
+          type: string
+          format: decimal
+        min_investment_usd:
+          type: string
+          format: decimal
+        max_investment_usd:
+          type: string
+          format: decimal
+        total_shares_available:
+          type: integer
+      required:
+        - property_id
+        - price_per_share_usd
+        - min_investment_usd
+        - total_shares_available
+
+    ListingUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        price_per_share_usd:
+          type: string
+          format: decimal
+        min_investment_usd:
+          type: string
+          format: decimal
+        max_investment_usd:
+          type: string
+          format: decimal
+        total_shares_available:
+          type: integer
+
+    Holding:
+      type: object
+      properties:
+        holding_id:
+          $ref: '#/components/schemas/UUID'
+        user_id:
+          $ref: '#/components/schemas/UUID'
+        listing_id:
+          $ref: '#/components/schemas/UUID'
+        share_quantity:
+          type: string
+          format: decimal
+        average_cost_basis_usd:
+          type: string
+          format: decimal
+        last_updated_at:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - holding_id
+        - user_id
+        - listing_id
+        - share_quantity
+        - average_cost_basis_usd
+
+    HoldingCreate:
+      type: object
+      properties:
+        user_id:
+          $ref: '#/components/schemas/UUID'
+        listing_id:
+          $ref: '#/components/schemas/UUID'
+        share_quantity:
+          type: string
+          format: decimal
+        average_cost_basis_usd:
+          type: string
+          format: decimal
+      required:
+        - user_id
+        - listing_id
+        - share_quantity
+        - average_cost_basis_usd
+
+    HoldingUpdate:
+      type: object
+      properties:
+        share_quantity:
+          type: string
+          format: decimal
+        average_cost_basis_usd:
+          type: string
+          format: decimal
+
+    Transaction:
+      type: object
+      properties:
+        transaction_id:
+          $ref: '#/components/schemas/UUID'
+        user_id:
+          $ref: '#/components/schemas/UUID'
+        listing_id:
+          $ref: '#/components/schemas/UUID'
+        transaction_type:
+          type: string
+          enum: [buy, sell]
+        share_quantity:
+          type: string
+          format: decimal
+        price_per_share_usd:
+          type: string
+          format: decimal
+        total_amount_usd:
+          type: string
+          format: decimal
+        status:
+          type: string
+        blockchain_hash:
+          type: string
+          nullable: true
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - transaction_id
+        - transaction_type
+        - share_quantity
+        - price_per_share_usd
+        - total_amount_usd
+        - status
+
+    TransactionCreate:
+      type: object
+      properties:
+        user_id:
+          $ref: '#/components/schemas/UUID'
+        listing_id:
+          $ref: '#/components/schemas/UUID'
+        transaction_type:
+          type: string
+          enum: [buy, sell]
+        share_quantity:
+          type: string
+          format: decimal
+        price_per_share_usd:
+          type: string
+          format: decimal
+        status:
+          type: string
+          default: pending
+        blockchain_hash:
+          type: string
+      required:
+        - user_id
+        - listing_id
+        - transaction_type
+        - share_quantity
+        - price_per_share_usd
+
+    TransactionUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        blockchain_hash:
+          type: string
+
+    Notification:
+      type: object
+      properties:
+        notification_id:
+          $ref: '#/components/schemas/UUID'
+        user_id:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+        body:
+          type: string
+          nullable: true
+        notification_type:
+          type: string
+          nullable: true
+        is_read:
+          type: boolean
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - notification_id
+        - user_id
+        - title
+        - is_read
+
+    NotificationCreate:
+      type: object
+      properties:
+        user_id:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+        body:
+          type: string
+        notification_type:
+          type: string
+      required:
+        - user_id
+        - title
+
+    NotificationUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        notification_type:
+          type: string
+        is_read:
+          type: boolean
+
+    AdminAction:
+      type: object
+      properties:
+        admin_action_id:
+          $ref: '#/components/schemas/UUID'
+        admin_user_id:
+          $ref: '#/components/schemas/UUID'
+        action_type:
+          type: string
+        target_property_id:
+          $ref: '#/components/schemas/UUID'
+        target_listing_id:
+          $ref: '#/components/schemas/UUID'
+        notes:
+          type: string
+          nullable: true
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - admin_action_id
+        - admin_user_id
+        - action_type
+
+    AdminActionCreate:
+      type: object
+      properties:
+        admin_user_id:
+          $ref: '#/components/schemas/UUID'
+        action_type:
+          type: string
+        target_property_id:
+          $ref: '#/components/schemas/UUID'
+        target_listing_id:
+          $ref: '#/components/schemas/UUID'
+        notes:
+          type: string
+      required:
+        - admin_user_id
+        - action_type
